@@ -15,6 +15,10 @@ TEST_FILE = "../resources/data/test_tweets_unlabeled.txt"
 GLOVE_25D = "../resources/glove/glove.twitter.27B.25d.txt"
 GLOVE_200D = "../resources/glove/glove.twitter.27B.200d.txt"
 
+#nltk.download('averaged_perceptron_tagger')
+#nltk.download('wordnet')
+#nltk.download('stopwords')
+
 # remove all RTs (reweets)
 def filter_RT(df):
     rt = df['Text'].str.startswith('RT @handle')
@@ -86,15 +90,22 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     
 from sklearn.feature_extraction.text import CountVectorizer
 from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.preprocessing import normalize
+
+from scipy import sparse
 
 from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 
 # merge all tweets from same user
 def merge_tweets(df):
-    aggregation_functions = {'Text': 'sum'}
+    df['Text'] = df['Text'].apply(lambda x: ''.join(i + ' ' for i in x))
+    
+    aggregation_functions = {'Text': ''.join}
     result_df = df.groupby(df['ID']).aggregate(aggregation_functions).reset_index()
     
+    df['Text'] = df['Text'].apply(lambda x: x.rstrip())
+    print("finish merge tweets")
     return result_df
     
 # extract tf-idf features
@@ -118,6 +129,67 @@ def tf_idf(train_df, test_df):
     print("Finish tf-idf feature extraction")
 
     return tfidf_train_df, tfidf_test_df
+
+# add lexicon features
+def add_lexicon_features(df, feature_vec=None):
+    features = []
+    for index, row in df.iterrows():
+        text, feature = row['Text'], []
+        feature.extend(avg_var_word_len(text))
+        feature.append(len(text))
+        
+        features.append(feature)
+    
+    A = np.array(features)
+    A = normalize(A, axis=0, norm='max')
+    
+    if feature_vec == None:
+        print("finish add lexicon features")
+        return sparse.csr_matrix(A)
+    else:
+        for column in A.T: 
+            feature_vec = sparse.hstack((feature_vec, column[:,None]))
+        
+        print("finish add lexicon features")
+        return feature_vec
+
+# caculate averge word length for given sentence (word should starts with alphabet letters)
+def avg_var_word_len(text):
+    words, length = text.split(' '), []
+    
+    for word in words:
+        if word[0].isalpha() and word[0].islower():
+            length.append(len(word))
+            
+    length = np.array(length)
+    
+    if length.size == 0:
+        return [0, 0, 0]
+    
+    return [np.mean(length), np.std(length), np.median(length)]
+    
+# generate substring for df
+def generate_substring(df, length=6):
+    iter_df = df.copy()
+    
+    for index, row in iter_df.iterrows():
+        text, new_words = row['Text'], []
+        words = text.split(' ')
+        
+        for word in words: 
+            if len(word) >= length:
+                for i in range(0, len(word)-length+1):
+                    sub_word = word[i:i + length]
+                    new_words.append(sub_word)
+                
+            new_words.append(word)
+        
+        new_text = ''.join(i + ' ' for i in new_words).rstrip()
+        
+        df.loc[index, 'Text'] = new_text
+    
+    print("Finish substring extraction")
+    return df
     
 from sklearn import svm
 from sklearn.naive_bayes import MultinomialNB
@@ -129,13 +201,13 @@ from sklearn.metrics import accuracy_score
 import csv
 
 # models
-models = [svm.LinearSVC(C=0.6, max_iter=1000)]
+models = [svm.LinearSVC(C=0.68, max_iter=1000)]
          # MultinomialNB()]
 
-titles = ['LinearSVM_0_6']
+titles = ['LinearSVM, 0.68']
           #'MNB']
           
-def cross_validate_tf_idf(df, merge=True):
+def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
     
     scores = {}
@@ -145,12 +217,21 @@ def cross_validate_tf_idf(df, merge=True):
         # merge all tweets from same user to one document string
         if merge:
             train_df = merge_tweets(train_df)
+        else:
+            train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
         
-        train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
         test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
+        
+        if substring:
+            train_df = generate_substring(train_df, length=substring_len)
+            test_df = generate_substring(test_df, length=substring_len)
         
         X_train, X_test = tf_idf(train_df, test_df)
         y_train, y_test = train_df['ID'], test_df['ID']
+        
+        if add_lexicon:
+            X_train = add_lexicon_features(train_df, feature_vec=X_train)
+            X_test = add_lexicon_features(test_df, feature_vec=X_test)
         
         for title, model in zip(titles, models):
             model.fit(X_train, y_train)
@@ -165,16 +246,25 @@ def cross_validate_tf_idf(df, merge=True):
         acc = scores[title] / 10
         print("####INFO: trainning", title, acc)
         
-def predict_tf_idf(train_df, test_df, merge=True):
+def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=False, substring_len=3):
     # merge all tweets from same user to one document string
     if merge:
         train_df = merge_tweets(train_df)
+    else:
+        train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
         
-    train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
+    
+    if substring:
+        train_df = generate_substring(train_df, length=substring_len)
+        test_df = generate_substring(test_df, length=substring_len)
         
     X_train, X_test = tf_idf(train_df, test_df)
     y_train = train_df['ID']
+    
+    if add_lexicon:
+        X_train = add_lexicon_features(train_df, feature_vec=X_train)
+        X_test = add_lexicon_features(test_df, feature_vec=X_test)
     
     for title, model in zip(titles, models):
         model.fit(X_train, y_train)
@@ -192,7 +282,7 @@ def predict_tf_idf(train_df, test_df, merge=True):
 # test
 pd.options.mode.chained_assignment = None
 
-raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
 raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
@@ -216,7 +306,7 @@ print(tf_idf_train.shape, tf_idf_test.shape)
 print(tf_idf_train)
 '''
 
-# cross_validate_tf_idf(preprocess_train_df, merge=False)
+# cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3)
 
-predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False)
+predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3)
 print("finished")
