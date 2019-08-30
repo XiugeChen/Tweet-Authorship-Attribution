@@ -1,5 +1,7 @@
 import nltk
 import pandas as pd
+import numpy as np
+
 import logging
 from nltk.tokenize import TweetTokenizer
 from nltk.stem import WordNetLemmatizer
@@ -24,11 +26,11 @@ def filter_RT(df):
 # remove special terms like "@handle", links
 def rmv_special_term(df, rmv_all_spec=False):
     # remove @s
-    result_df = df.replace(to_replace ='@handle', value = '', regex=True)
+    result_df = df.replace(to_replace ='@handle', value = '@handle', regex=True)
     # remove # but save tags
     result_df = result_df.replace(to_replace ='#', value = '', regex=True)
     # remove links and urls
-    result_df = result_df.replace(to_replace ='\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', value = '', regex=True)
+    result_df = result_df.replace(to_replace ='\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', value = '@url', regex=True)
     
     # filter out all chars except 1-9/a-z/A-Z, such as :-( ' , . / \ 
     if rmv_all_spec:
@@ -50,20 +52,26 @@ cached_stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
 # main call
-def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False):
+def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, add_pos=False):
     logging.info('Preprocess starting')
     
     if rmv_rt:
         df = filter_RT(df)
+    else:
+        df = df.replace(to_replace ='^RT @handle.*', value = '@rt', regex=True)
     
     result_df = rmv_special_term(df, rmv_all_spec)
     
-    #result_df['Text'] = result_df['Text'].str.lower()
     result_df['Text'] = result_df['Text'].apply(lambda x: x.lower().rstrip().lstrip())
     
     # tokenize sentence
     tknzr = TweetTokenizer()
     result_df['Text'] = result_df['Text'].apply(lambda x: tknzr.tokenize(x))
+    
+    # add pos tags
+    if add_pos:
+        result_df['Text'] = result_df['Text'].apply(lambda x: np.asarray(nltk.pos_tag(x)))
+        result_df['Text'] = result_df['Text'].apply(lambda x: x.ravel())
         
     # remove stop words
     if rmv_stop:
@@ -106,12 +114,10 @@ def tf_idf(train_df, test_df):
     transformer = TfidfTransformer(smooth_idf=True, use_idf=True)
     tfidf_train_df = transformer.fit_transform(trian_wc_vec)
     tfidf_test_df = transformer.transform(test_wc_vec)
+    
+    print("Finish tf-idf feature extraction")
 
     return tfidf_train_df, tfidf_test_df
-    
-# extract word vector features
-def wordvec(train_df, test_df, sizeD=25):
-    return
     
 from sklearn import svm
 from sklearn.naive_bayes import MultinomialNB
@@ -123,14 +129,13 @@ from sklearn.metrics import accuracy_score
 import csv
 
 # models
-models = [svm.LinearSVC(C=1, max_iter=1000),
-          MultinomialNB(),
-          ]
+models = [svm.LinearSVC(C=0.6, max_iter=1000)]
+         # MultinomialNB()]
 
-titles = ['LinearSVM',
-          'MNB']
+titles = ['LinearSVM_0_6']
+          #'MNB']
           
-def cross_validate_tf_idf(df):
+def cross_validate_tf_idf(df, merge=True):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
     
     scores = {}
@@ -138,7 +143,8 @@ def cross_validate_tf_idf(df):
         train_df, test_df = df.iloc[train_index].reset_index(drop=True), df.iloc[test_index].reset_index(drop=True)
         
         # merge all tweets from same user to one document string
-        train_df = merge_tweets(train_df)
+        if merge:
+            train_df = merge_tweets(train_df)
         
         train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
         test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
@@ -159,9 +165,10 @@ def cross_validate_tf_idf(df):
         acc = scores[title] / 10
         print("####INFO: trainning", title, acc)
         
-def predict_tf_idf(train_df, test_df):
+def predict_tf_idf(train_df, test_df, merge=True):
     # merge all tweets from same user to one document string
-    train_df = merge_tweets(train_df)
+    if merge:
+        train_df = merge_tweets(train_df)
         
     train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
@@ -171,7 +178,9 @@ def predict_tf_idf(train_df, test_df):
     
     for title, model in zip(titles, models):
         model.fit(X_train, y_train)
+        print("model fit finished")
         label = model.predict(X_test)
+        print("model predict finished")
     
         wtr = csv.writer(open('prediction_' + title + '.csv', 'w'), delimiter=',', lineterminator='\n')
         wtr.writerow(['Id','Predicted'])
@@ -183,14 +192,18 @@ def predict_tf_idf(train_df, test_df):
 # test
 pd.options.mode.chained_assignment = None
 
-raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
 raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
 
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=True, rmv_all_spec=False, rmv_stop=True, lemmatize=True)
-preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=True, lemmatize=True)
+print("Finish reading")
+
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, add_pos=True)
+preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, add_pos=True)
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
+
+print("Finsih preprocess")
 
 '''
 merged_train_df = merge_tweets(preprocess_train_df)
@@ -203,7 +216,7 @@ print(tf_idf_train.shape, tf_idf_test.shape)
 print(tf_idf_train)
 '''
 
-#cross_validate_tf_idf(preprocess_train_df)
+# cross_validate_tf_idf(preprocess_train_df, merge=False)
 
-predict_tf_idf(preprocess_train_df, preprocess_test_df)
-print("finished")  
+predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False)
+print("finished")
