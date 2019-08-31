@@ -1,0 +1,78 @@
+Add sentiment analysis:
+####INFO: trainning LinearSVM, 0.68 0.45296610169491514
+
+
+######### Code 17:02
+# test
+pd.options.mode.chained_assignment = None
+
+raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+# raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
+# print(train_df.shape)
+# print(test_df.shape)
+
+print("Finish reading")
+
+for i in [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 100]:
+    print("start ngram pos test: n = " + str(i))
+    preprocess_train_df = preprocess(raw_train_df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=True, pos_ngram=i)
+    # preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, add_pos=True)
+    #print(preprocess_train_df.shape, preprocess_test_df.shape)
+
+    print("")
+    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
+
+#predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3)
+#print("finished")
+
+######### Result
+1-10: performance decrease from 45-41
+100 performs best: 
+####INFO: trainning LinearSVM, 0.68 0.4547669491525423
+
+
+
+######### Code 17:36
+# test
+pd.options.mode.chained_assignment = None
+
+raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+# raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
+# print(train_df.shape)
+# print(test_df.shape)
+
+print("Finish reading")
+
+for i in range(1, 5):
+    print("start ngram word test: n = " + str(i))
+    preprocess_train_df = preprocess(raw_train_df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=i, add_pos=True, pos_ngram=1000)
+    # preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, add_pos=True)
+    #print(preprocess_train_df.shape, preprocess_test_df.shape)
+
+    print("")
+    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
+
+#predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3)
+#print("finished")
+
+######### Result
+Finish reading
+start ngram word test: n = 1
+####INFO: trainning LinearSVM, 0.68 0.4547669491525423
+start ngram word test: n = 2
+####INFO: trainning LinearSVM, 0.68 0.45508474576271185
+start ngram word test: n = 3
+####INFO: trainning LinearSVM, 0.68 0.43792372881355934
+start ngram word test: n = 4
+####INFO: trainning LinearSVM, 0.68 0.42934322033898303
+
+#Remove all retweet
+start with RT @handle, ####INFO: trainning LinearSVM, 0.68 0.42707476373275377
+only remove sub-text contain RT @handle, ####INFO: trainning LinearSVM, 0.68 0.42797237031420704
+only replace RT with @RT, ####INFO: trainning LinearSVM, 0.68 0.45161800029054555
+do nothing, ####INFO: trainning LinearSVM, 0.68 0.4511194958040051
+
+for only replace RT with @RT:
+no pos tag on rt content, ####INFO: trainning LinearSVM, 0.68 0.45032139111607294
+no sentiment on rt content, ####INFO: trainning LinearSVM, 0.68 0.45161839829811967
+both: ####INFO: trainning LinearSVM, 0.68 0.45022099370551016
