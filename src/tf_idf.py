@@ -394,8 +394,8 @@ raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text']
 # print(test_df.shape)
 
 print("Finish reading")
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=2, add_pos=True, pos_ngram=1000)
-preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=2, add_pos=True, pos_ngram=1000)
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=True, pos_ngram=1)
+preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=True, pos_ngram=1)
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
 print("Finsih preprocess")
