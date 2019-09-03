@@ -56,7 +56,7 @@ cached_stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
 # main call
-def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=False, pos_ngram=1):
+def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1]):
     logging.info('Preprocess starting')
     
     if rmv_rt:
@@ -76,7 +76,7 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     if add_pos:
         result_df['Text'] = result_df['Text'].apply(lambda x: pos_analysis(x, ngram=pos_ngram))
         
-    if word_ngram > 1:
+    if len(word_ngram) > 0:
         result_df['Text'] = result_df['Text'].apply(lambda x: get_word_ngram(x, ngram=word_ngram))
          
     # remove stop words
@@ -91,53 +91,62 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     return result_df
     
 # analysis POS (part of speech) and ngram
-def pos_analysis(word_list, ngram=1):
+def pos_analysis(word_list, ngram=[1]):
     postag_word = np.asarray(nltk.pos_tag(word_list))
-    
-    if ngram == 1:
-        return postag_word.ravel();
     
     # get only pos tags
     pos_tags = []
     for chunk in postag_word:
         pos_tags.append(chunk[1])
+    
+    result = word_list
+    for n in ngram:
+        pos_ngrams = []
         
-    pos_ngrams = []
-    if ngram >= len(pos_tags):
-        pos_ngrams.append(''.join(tag for tag in pos_tags))
-    else:
-        for i in range(0, len(pos_tags)-ngram+1):
-            new_tag = ''
-            for j in range(i, i+ngram):
-                new_tag += str(pos_tags[j])
+        if n == 1:
+            pos_ngrams = pos_tags
+        else:
+            if n >= len(pos_tags):
+                pos_ngrams.append(''.join(tag for tag in pos_tags))
+            else:
+                for i in range(0, len(pos_tags)-n+1):
+                    new_tag = ''
+                    for j in range(i, i+n):
+                        new_tag += str(pos_tags[j])
                 
-            pos_ngrams.append(new_tag)
+                    pos_ngrams.append(new_tag)
         
-    result = np.append(postag_word, [i for i in pos_ngrams])
+        result = np.append(result, [i for i in pos_ngrams])
     
     return result
     
 # get word ngram
-def get_word_ngram(raw_word_list, ngram=1):
-    if ngram == 1:
-        return raw_word_list
-    
-    result = raw_word_list
+def get_word_ngram(raw_word_list, ngram=[1]):
+    result = []
     # get pure word list, eliminate pos tags
     pure_word_list = []
     for word in raw_word_list:
+        if len(word) < 1:
+            continue
+        
         if not word[0].isupper():
             pure_word_list.append(word)
-            
-    if ngram >= len(pure_word_list):
-        result = np.append(result, ''.join(word for word in pure_word_list))
-    else:
-        for i in range(0, len(pure_word_list)-ngram+1):
-            new_tag = ''
-            for j in range(i, i+ngram):
-                new_tag += str(pure_word_list[j])
+        else:
+            result.append(word)
+    
+    for n in ngram:
+        if n == 1:
+            result = np.append(result, pure_word_list)
+        else:
+            if n >= len(pure_word_list):
+                result = np.append(result, ''.join(word for word in pure_word_list))
+            else:
+                for i in range(0, len(pure_word_list)-n+1):
+                    new_tag = ''
+                    for j in range(i, i+n):
+                        new_tag += str(pure_word_list[j])
                 
-            result = np.append(result, new_tag)
+                    result = np.append(result, new_tag)
     
     return result
     
@@ -283,6 +292,7 @@ def sentiment_analysis(df, feature_vec=None):
 from sklearn import svm
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
+from xgboost import XGBClassifier
 
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
@@ -291,14 +301,16 @@ import csv
 
 # models
 models = [svm.LinearSVC(C=0.68, max_iter=1000)]
+         #XGBClassifier(random_state=42, seed=2, colsample_bytree=0.6, subsample=0.7, max_depth=3, n_estimators=300, learning_rate=0.1)]
           #LogisticRegression(solver="lbfgs", penalty="l2", C=0.65, multi_class='auto', max_iter=1000)]
          # MultinomialNB()]
 
 titles = ['LinearSVM, 0.68']
+         #'XGBoost']
          #'LogisticRegression']
           #'MNB']
           
-def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False):
+def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
     
     scores = {}
@@ -327,6 +339,9 @@ def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, s
         if add_sentiment:
             X_train = sentiment_analysis(train_df, feature_vec=X_train)
             X_test = sentiment_analysis(test_df, feature_vec=X_test)
+            
+        if pca:
+            X_train, X_test = pca_reduction(X_train, X_test)
         
         for title, model in zip(titles, models):
             model.fit(X_train, y_train)
@@ -371,7 +386,6 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
         X_train = sentiment_analysis(train_df, feature_vec=X_train)
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
     
-    print("start train model")
     for title, model in zip(titles, models):
         model.fit(X_train, y_train)
         print("model fit finished")
@@ -384,6 +398,73 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
             wtr.writerow([i+1, label[i]])
     
     return
+
+# Helper functions for stacking
+def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], addsentiment=True):
+    train_df = preprocess(train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
+    test_df = preprocess(test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
+    
+    train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
+    test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
+    
+    X_train, X_test = tf_idf(train_df, test_df)
+    y_train, y_test = train_df['ID'], test_df['ID']
+    
+    if addsentiment:
+        X_train = sentiment_analysis(train_df, feature_vec=X_train)
+        X_test = sentiment_analysis(test_df, feature_vec=X_test)
+        
+    model.fit(X_train, y_train)
+    train_labels = model.predict(X_train)
+    predicted_labels = model.predict(X_test)
+    
+    return np.array(train_labels).reshape(-1,1), np.array(predicted_labels).reshape(-1,1)
+
+# stacking
+def stacking_cross_validate(raw_df, add_sentiment=True):
+    cv = KFold(n_splits=10, random_state=90051, shuffle=True)
+    
+    score = 0
+    for train_index, test_index in cv.split(raw_df):
+        train_df, test_df = raw_df.iloc[train_index].reset_index(drop=True), raw_df.iloc[test_index].reset_index(drop=True)
+        y_train, y_test = train_df['ID'], test_df['ID']
+        
+        svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
+        
+        train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True)
+        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True)
+        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True)
+        
+        h_model = svm.LinearSVC(C=0.68, max_iter=1000)
+        
+        X_train = np.concatenate((train_1, train_2, train_3), axis=1)
+        X_train = sparse.csr_matrix(X_train)
+        
+        X_test = np.concatenate((test_1, test_2, test_3), axis=1)
+        X_test = sparse.csr_matrix(X_test)
+        
+        print(X_train)
+        
+        h_model.fit(X_train, y_train)
+        train_acc = accuracy_score(h_model.predict(X_train), y_train)
+        
+        predicted_labels = h_model.predict(X_test)
+        acc = accuracy_score(predicted_labels, y_test)
+        
+        sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(train_1, y_train), accuracy_score(train_2, y_train), accuracy_score(train_3, y_train)
+        print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
+        sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(test_1, y_test), accuracy_score(test_2, y_test), accuracy_score(test_3, y_test)
+        print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
+        
+        # uncomment to print miss labeled data
+        # for i in range(0, len(predicted_labels)):
+        #   if predicted_labels[i] != y_test[i]:
+        #        print("#" + str(i) + "; T: " + str(y_test[i]) + "; F: " + str(predicted_labels[i]) + "; Text: " + test_df.loc[i,'Text'])
+        
+        score += acc
+        
+    avg_acc = score / 10
+    print("####INFO: trainning", 'Stacking', avg_acc)
     
 # test
 pd.options.mode.chained_assignment = None
@@ -394,13 +475,14 @@ raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text']
 # print(test_df.shape)
 
 print("Finish reading")
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=True, pos_ngram=1)
-preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=1, add_pos=True, pos_ngram=1)
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[0], add_pos=True, pos_ngram=[1000])
+preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[0], add_pos=True, pos_ngram=[1000])
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
 print("Finsih preprocess")
+#cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
 
-#cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
+#stacking_cross_validate(raw_train_df, add_sentiment=True)
 
 predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
 print("finished")
