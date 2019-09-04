@@ -32,7 +32,7 @@ def rmv_special_term(df, rmv_all_spec=False):
     # remove @s
     result_df = df.replace(to_replace ='@handle', value = '@handle', regex=True)
     # remove # but save tags
-    result_df = result_df.replace(to_replace ='#', value = '', regex=True)
+    result_df = result_df.replace(to_replace ='#', value = '#', regex=True)
     # remove links and urls
     result_df = result_df.replace(to_replace ='\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', value = '@url', regex=True)
     
@@ -186,7 +186,7 @@ def tf_idf(train_df, test_df):
     
     #create a vocabulary of words, 
     #ignore words that appear in max_df of documents
-    cv = CountVectorizer(max_df=0.42, min_df=1, decode_error='ignore')
+    cv = CountVectorizer(max_df=0.85, min_df=1, decode_error='ignore')
     trian_wc_vec = cv.fit_transform(train_docs)
     test_wc_vec = cv.transform(test_docs)
     
