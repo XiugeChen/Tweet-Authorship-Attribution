@@ -7,6 +7,25 @@ from nltk.tokenize import TweetTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
+    
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.preprocessing import normalize
+from sklearn import svm
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
+
+from scipy import sparse
+
+from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
+
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from xgboost import XGBClassifier
+
+import csv
 
 TRAIN_FILE = "../resources/data/train_tweets.txt"
 SML_TRAIN_FILE = "../resources/data/test.txt"
@@ -19,20 +38,20 @@ GLOVE_200D = "../resources/glove/glove.twitter.27B.200d.txt"
 #nltk.download('wordnet')
 #nltk.download('stopwords')
 
-# remove all RTs (reweets)
 def filter_RT(df):
+    """remove all RTs (reweets)"""
     rt = df['Text'].str.startswith('RT @handle')
     not_rt = [not i for i in rt]
     result_df = df[not_rt]
     result_df = result_df.reset_index(drop=True)
     return result_df
     
-# remove special terms like "@handle", links
 def rmv_special_term(df, rmv_all_spec=False):
+    """remove special terms like "@handle", links"""
     # remove @s
     result_df = df.replace(to_replace ='@handle', value = '@handle', regex=True)
     # remove # but save tags
-    result_df = result_df.replace(to_replace ='#', value = '', regex=True)
+    result_df = result_df.replace(to_replace ='#', value = '#', regex=True)
     # remove links and urls
     result_df = result_df.replace(to_replace ='\w+:\/{2}[\d\w-]+(\.[\d\w-]+)*(?:(?:\/[^\s/]*))*', value = '@url', regex=True)
     
@@ -66,7 +85,7 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     
     result_df = rmv_special_term(df, rmv_all_spec)
     
-    result_df['Text'] = result_df['Text'].apply(lambda x: x.lower().rstrip().lstrip())
+    result_df['Text'] = result_df['Text'].apply(lambda x: x.rstrip().lstrip())
     
     # tokenize sentence
     tknzr = TweetTokenizer()
@@ -92,6 +111,9 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     
 # analysis POS (part of speech) and ngram
 def pos_analysis(word_list, ngram=[1]):
+    if 0 in ngram:
+        return word_list
+    
     postag_word = np.asarray(nltk.pos_tag(word_list))
     
     # get only pos tags
@@ -133,6 +155,9 @@ def get_word_ngram(raw_word_list, ngram=[1]):
             pure_word_list.append(word)
         else:
             result.append(word)
+            
+    if 0 in ngram:
+        return result
     
     for n in ngram:
         if n == 1:
@@ -149,20 +174,9 @@ def get_word_ngram(raw_word_list, ngram=[1]):
                     result = np.append(result, new_tag)
     
     return result
-    
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.preprocessing import normalize
 
-from scipy import sparse
-
-from gensim.models import Word2Vec
-from gensim.models import KeyedVectors
-
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-# merge all tweets from same user
 def merge_tweets(df):
+    """merge all tweets from same user"""
     df['Text'] = df['Text'].apply(lambda x: ''.join(i + ' ' for i in x))
     
     aggregation_functions = {'Text': ''.join}
@@ -172,16 +186,15 @@ def merge_tweets(df):
     print("finish merge tweets")
     return result_df
     
-# extract tf-idf features
 def tf_idf(train_df, test_df):
+    """extract tf-idf features"""
     #get the text column 
     train_docs = train_df['Text'].tolist()
     test_docs = test_df['Text'].tolist()
     
     #create a vocabulary of words, 
     #ignore words that appear in max_df of documents
-    stop_words = stopwords.words('english')
-    cv = CountVectorizer(max_df=0.85, stop_words=stop_words, decode_error='ignore')
+    cv = CountVectorizer(max_df=0.85, min_df=1, decode_error='ignore')
     trian_wc_vec = cv.fit_transform(train_docs)
     test_wc_vec = cv.transform(test_docs)
     
@@ -194,8 +207,8 @@ def tf_idf(train_df, test_df):
 
     return tfidf_train_df, tfidf_test_df
 
-# add lexicon features
 def add_lexicon_features(df, feature_vec=None):
+    """add lexicon features"""
     features = []
     for index, row in df.iterrows():
         text, feature = row['Text'], []
@@ -217,8 +230,10 @@ def add_lexicon_features(df, feature_vec=None):
         print("finish add lexicon features")
         return feature_vec
 
-# caculate averge word length for given sentence (word should starts with alphabet letters)
 def avg_var_word_len(text):
+    """caculate averge word length for given sentence (word should starts 
+    with alphabet letters)
+    """
     words, length = text.split(' '), []
     
     for word in words:
@@ -232,8 +247,9 @@ def avg_var_word_len(text):
     
     return [np.mean(length), np.std(length), np.median(length)]
     
-# generate substring for df
+
 def generate_substring(df, length=6):
+    """generate substring for df"""
     iter_df = df.copy()
     
     for index, row in iter_df.iterrows():
@@ -257,8 +273,9 @@ def generate_substring(df, length=6):
     
 analyser = SentimentIntensityAnalyzer()
 
-# sentiment analysis
+
 def sentiment_analysis(df, feature_vec=None):
+    """sentiment analysis"""
     sentiment_scores = []
     for index, row in df.iterrows():
         text, ori_words = row['Text'], []
@@ -271,8 +288,7 @@ def sentiment_analysis(df, feature_vec=None):
             if len(word) < 1:
                 continue
                 
-            if not word[0].isupper():
-                ori_words.append(word)
+            ori_words.append(word)
                 
         sentence = ''.join(i + ' ' for i in ori_words).rstrip()
         score = analyser.polarity_scores(sentence)
@@ -280,34 +296,25 @@ def sentiment_analysis(df, feature_vec=None):
         
     A = np.array(sentiment_scores)
     if feature_vec == None:
-        print("finish add sentiment features")
+        #print("finish add sentiment features")
         return sparse.csr_matrix(A)
     else:
         for column in A.T: 
             feature_vec = sparse.hstack((feature_vec, column[:,None]))
         
-        print("finish add sentiment features")
+        #print("finish add sentiment features")
         return feature_vec
     
-from sklearn import svm
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-
-from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
-
-import csv
 
 # models
 models = [svm.LinearSVC(C=0.68, max_iter=1000)]
+          #LogisticRegression(solver="lbfgs", penalty="l2", C=1e-2, multi_class='auto', max_iter=1000, fit_intercept= False)]
          #XGBClassifier(random_state=42, seed=2, colsample_bytree=0.6, subsample=0.7, max_depth=3, n_estimators=300, learning_rate=0.1)]
-          #LogisticRegression(solver="lbfgs", penalty="l2", C=0.65, multi_class='auto', max_iter=1000)]
          # MultinomialNB()]
 
 titles = ['LinearSVM, 0.68']
+          #'LogisticRegression']
          #'XGBoost']
-         #'LogisticRegression']
           #'MNB']
           
 def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
@@ -387,8 +394,9 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
     
     for title, model in zip(titles, models):
+        print("start training")
         model.fit(X_train, y_train)
-        print("model fit finished")
+        print("model " + title + " fit finished")
         label = model.predict(X_test)
         print("model predict finished")
     
@@ -420,7 +428,6 @@ def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], ad
     
     return np.array(train_labels).reshape(-1,1), np.array(predicted_labels).reshape(-1,1)
 
-# stacking
 def stacking_cross_validate(raw_df, add_sentiment=True):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
     
@@ -437,13 +444,24 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         
         h_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
-        X_train = np.concatenate((train_1, train_2, train_3), axis=1)
-        X_train = sparse.csr_matrix(X_train)
+        X_train, X_test = [], []
+        for i in range(0, len(train_1)):
+            X_train.append(str(train_1[i]) + ' ' + str(train_2[i]) + ' ' + str(train_3[i]))
+        for i in range(0, len(test_1)):
+            X_test.append(str(test_1[i]) + ' ' + str(test_2[i]) + ' ' + str(test_3[i]))
         
-        X_test = np.concatenate((test_1, test_2, test_3), axis=1)
-        X_test = sparse.csr_matrix(X_test)
+        X_train = np.array(X_train)
+        X_test = np.array(X_test)
         
-        print(X_train)
+        stop_words = stopwords.words('english')
+        cv = CountVectorizer(max_df=0.85, stop_words=stop_words, decode_error='ignore')
+        trian_wc_vec = cv.fit_transform(X_train)
+        test_wc_vec = cv.transform(X_test)
+    
+        # get tfidf
+        transformer = TfidfTransformer(smooth_idf=True, use_idf=True)
+        X_train = transformer.fit_transform(trian_wc_vec)
+        X_test = transformer.transform(test_wc_vec)
         
         h_model.fit(X_train, y_train)
         train_acc = accuracy_score(h_model.predict(X_train), y_train)
@@ -452,9 +470,9 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         acc = accuracy_score(predicted_labels, y_test)
         
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(train_1, y_train), accuracy_score(train_2, y_train), accuracy_score(train_3, y_train)
-        print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
+        #print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(test_1, y_test), accuracy_score(test_2, y_test), accuracy_score(test_3, y_test)
-        print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
+        #print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
         
         # uncomment to print miss labeled data
         # for i in range(0, len(predicted_labels)):
@@ -475,8 +493,8 @@ raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text']
 # print(test_df.shape)
 
 print("Finish reading")
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[0], add_pos=True, pos_ngram=[1000])
-preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[0], add_pos=True, pos_ngram=[1000])
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
 print("Finsih preprocess")
