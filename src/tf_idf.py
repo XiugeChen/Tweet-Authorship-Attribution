@@ -313,12 +313,14 @@ def sentiment_analysis(df, feature_vec=None):
 models = [svm.LinearSVC(C=0.68, max_iter=1000),
           SGDClassifier(loss="hinge", penalty="l2", max_iter=1000, n_jobs=-1, tol=1e-4),
           LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
-          MultinomialNB()]
+          MultinomialNB(),
+          KNeighborsClassifier(n_neighbors=5)]
 
 titles = ['LinearSVM',
           'SGDClassifier',
           'LogisticRegression',
-          'MNB']
+          'MNB',
+          'KNN']
           
 def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
@@ -445,8 +447,8 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
         train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
-        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=2)
-        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True, min_tf_idf=2)
+        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[1,2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
+        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True, min_tf_idf=1)
         
         h_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
@@ -540,3 +542,5 @@ print("####INFO: feature combination e")
 preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1,2], add_pos=True, pos_ngram=[1,1000])
 print("####INFO: Finsih preprocess")
 cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True, substring=True, substring_len=3, add_sentiment=True, pca=False)
+
+stacking_cross_validate(raw_train_df, add_sentiment=True)
