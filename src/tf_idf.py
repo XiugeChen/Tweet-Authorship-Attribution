@@ -30,6 +30,15 @@ from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
 
 import csv
 
+from extract_users_from_source import extract_users_from_source
+
+# Extract certain number of users from the source file for experiments.
+extract_users_from_source(50)
+extract_users_from_source(100)
+extract_users_from_source(200)
+extract_users_from_source(500)
+extract_users_from_source(1000)
+
 TRAIN_FILE = "../resources/data/train_tweets.txt"
 SML_TRAIN_FILE = "../resources/data/test.txt"
 TEST_FILE = "../resources/data/test_tweets_unlabeled.txt"

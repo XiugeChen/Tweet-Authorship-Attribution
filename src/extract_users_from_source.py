@@ -27,6 +27,8 @@ def extract_users_from_source(number_of_users=100):
                 target_file.write(row)
 
 
-extract_users_from_source()
+extract_users_from_source(50)
+extract_users_from_source(100)
 extract_users_from_source(200)
 extract_users_from_source(500)
+extract_users_from_source(1000)
