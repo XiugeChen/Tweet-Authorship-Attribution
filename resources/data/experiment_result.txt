@@ -1,0 +1,33 @@
+####INFO: Finish reading
+####INFO: feature combination a
+####INFO: Finsih preprocess
+####INFO: trainning LinearSVM 0.45181282289599495
+####INFO: trainning SGDClassifier 0.4494486171468764
+####INFO: trainning LogisticRegression 0.329794072250552
+####INFO: trainning MNB 0.19253644485752802
+####INFO: trainning KNN 0.3274301456119638
+####INFO: feature combination b
+####INFO: Finsih preprocess
+####INFO: trainning LinearSVM 0.4583078644974196
+####INFO: trainning SGDClassifier 0.4486210544237624
+####INFO: trainning LogisticRegression 0.26140208383922114
+####INFO: trainning KNN 0.302625453205724
+####INFO: feature combination c
+####INFO: Finsih preprocess
+####INFO: trainning LinearSVM 0.4508667777526577
+####INFO: trainning SGDClassifier 0.43929080805289705
+####INFO: trainning LogisticRegression 0.24675701474540931
+####INFO: trainning KNN 0.28017966344852224
+####INFO: feature combination d
+####INFO: Finsih preprocess
+####INFO: trainning LinearSVM 0.43562594723136305
+####INFO: trainning SGDClassifier 0.4262947239736408
+####INFO: trainning LogisticRegression 0.25089092081355135
+####INFO: trainning KNN 0.2690767860980627
+####INFO: feature combination e
+####INFO: Finsih preprocess
+####INFO: trainning LinearSVM 0.43539037794356944
+####INFO: trainning SGDClassifier 0.4124754033844943
+####INFO: trainning LogisticRegression 0.2545535487508408
+####INFO: trainning KNN 0.27415589997795026
+####INFO: trainning Stacking 0.4676393668656725
