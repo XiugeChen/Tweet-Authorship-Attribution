@@ -14,6 +14,10 @@ from sklearn.preprocessing import normalize
 from sklearn import svm
 from sklearn.naive_bayes import MultinomialNB
 from sklearn.linear_model import LogisticRegression
+from sklearn.linear_model import SGDClassifier
+from sklearn.neighbors import KNeighborsClassifier
+from sklearn.neighbors import RadiusNeighborsClassifier
+
 from sklearn.model_selection import KFold
 from sklearn.metrics import accuracy_score
 
@@ -23,7 +27,6 @@ from gensim.models import Word2Vec
 from gensim.models import KeyedVectors
 
 from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-from xgboost import XGBClassifier
 
 import csv
 
@@ -183,10 +186,10 @@ def merge_tweets(df):
     result_df = df.groupby(df['ID']).aggregate(aggregation_functions).reset_index()
     
     df['Text'] = df['Text'].apply(lambda x: x.rstrip())
-    print("finish merge tweets")
+    #print("finish merge tweets")
     return result_df
     
-def tf_idf(train_df, test_df):
+def tf_idf(train_df, test_df, min_df=1):
     """extract tf-idf features"""
     #get the text column 
     train_docs = train_df['Text'].tolist()
@@ -194,7 +197,7 @@ def tf_idf(train_df, test_df):
     
     #create a vocabulary of words, 
     #ignore words that appear in max_df of documents
-    cv = CountVectorizer(max_df=0.85, min_df=1, decode_error='ignore')
+    cv = CountVectorizer(max_df=0.42, min_df=min_df, decode_error='ignore')
     trian_wc_vec = cv.fit_transform(train_docs)
     test_wc_vec = cv.transform(test_docs)
     
@@ -203,7 +206,7 @@ def tf_idf(train_df, test_df):
     tfidf_train_df = transformer.fit_transform(trian_wc_vec)
     tfidf_test_df = transformer.transform(test_wc_vec)
     
-    print("Finish tf-idf feature extraction")
+    #print("Finish tf-idf feature extraction")
 
     return tfidf_train_df, tfidf_test_df
 
@@ -221,13 +224,13 @@ def add_lexicon_features(df, feature_vec=None):
     A = normalize(A, axis=0, norm='max')
     
     if feature_vec == None:
-        print("finish add lexicon features")
+        #print("finish add lexicon features")
         return sparse.csr_matrix(A)
     else:
         for column in A.T: 
             feature_vec = sparse.hstack((feature_vec, column[:,None]))
         
-        print("finish add lexicon features")
+        #print("finish add lexicon features")
         return feature_vec
 
 def avg_var_word_len(text):
@@ -268,7 +271,7 @@ def generate_substring(df, length=6):
         
         df.loc[index, 'Text'] = new_text
     
-    print("Finish substring extraction")
+    #print("Finish substring extraction")
     return df
     
 analyser = SentimentIntensityAnalyzer()
@@ -307,21 +310,22 @@ def sentiment_analysis(df, feature_vec=None):
     
 
 # models
-models = [svm.LinearSVC(C=0.68, max_iter=1000)]
-          #LogisticRegression(solver="lbfgs", penalty="l2", C=1e-2, multi_class='auto', max_iter=1000, fit_intercept= False)]
-         #XGBClassifier(random_state=42, seed=2, colsample_bytree=0.6, subsample=0.7, max_depth=3, n_estimators=300, learning_rate=0.1)]
-         # MultinomialNB()]
+models = [svm.LinearSVC(C=0.68, max_iter=1000),
+          SGDClassifier(loss="hinge", penalty="l2", max_iter=1000, n_jobs=-1, tol=1e-4),
+          LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
+          MultinomialNB()]
 
-titles = ['LinearSVM, 0.68']
-          #'LogisticRegression']
-         #'XGBoost']
-          #'MNB']
+titles = ['LinearSVM',
+          'SGDClassifier',
+          'LogisticRegression',
+          'MNB']
           
 def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
     
     scores = {}
     for train_index, test_index in cv.split(df):
+        #print("Batch start")
         train_df, test_df = df.iloc[train_index].reset_index(drop=True), df.iloc[test_index].reset_index(drop=True)
         
         # merge all tweets from same user to one document string
@@ -351,9 +355,11 @@ def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, s
             X_train, X_test = pca_reduction(X_train, X_test)
         
         for title, model in zip(titles, models):
+            #print("Start train " + title)
             model.fit(X_train, y_train)
             predicted_labels = model.predict(X_test)
             acc = accuracy_score(predicted_labels, y_test)
+            #print(title + " " + str(acc))
             
             # uncomment to print miss labeled data
             # for i in range(0, len(predicted_labels)):
@@ -394,11 +400,11 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
     
     for title, model in zip(titles, models):
-        print("start training")
+        #print("start training")
         model.fit(X_train, y_train)
-        print("model " + title + " fit finished")
+        #print("model " + title + " fit finished")
         label = model.predict(X_test)
-        print("model predict finished")
+        #print("model predict finished")
     
         wtr = csv.writer(open('prediction_' + title + '.csv', 'w'), delimiter=',', lineterminator='\n')
         wtr.writerow(['Id','Predicted'])
@@ -408,14 +414,14 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
     return
 
 # Helper functions for stacking
-def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], addsentiment=True):
+def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1):
     train_df = preprocess(train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
     test_df = preprocess(test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
     
     train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     
-    X_train, X_test = tf_idf(train_df, test_df)
+    X_train, X_test = tf_idf(train_df, test_df, min_df=min_tf_idf)
     y_train, y_test = train_df['ID'], test_df['ID']
     
     if addsentiment:
@@ -438,9 +444,9 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         
         svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
-        train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True)
-        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True)
-        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True)
+        train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
+        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=2)
+        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True, min_tf_idf=2)
         
         h_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
@@ -487,20 +493,50 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
 # test
 pd.options.mode.chained_assignment = None
 
-raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
-raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
+# raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+# raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
 
-print("Finish reading")
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
-preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+# print("Finish reading")
+# preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+# preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
-print("Finsih preprocess")
-#cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
+# print("Finsih preprocess")
+# cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
 
 #stacking_cross_validate(raw_train_df, add_sentiment=True)
 
-predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
-print("finished")
+# predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
+# print("finished")
+
+user200_file = "../resources/data/200_train_tweets.txt"
+
+raw_train_df = pd.read_csv(user200_file, delimiter='\t', header=None, names=['ID','Text'])
+print("####INFO: Finish reading")
+
+print("####INFO: feature combination a")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1])
+print("####INFO: Finsih preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False)
+
+print("####INFO: feature combination b")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+print("####INFO: Finsih preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
+
+print("####INFO: feature combination c")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1,2], add_pos=True, pos_ngram=[1,1000])
+print("####INFO: Finsih preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
+
+print("####INFO: feature combination d")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1,2], add_pos=True, pos_ngram=[1,1000])
+print("####INFO: Finsih preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=True, substring_len=3, add_sentiment=True, pca=False)
+
+print("####INFO: feature combination e")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1,2], add_pos=True, pos_ngram=[1,1000])
+print("####INFO: Finsih preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True, substring=True, substring_len=3, add_sentiment=True, pca=False)
