@@ -6,6 +6,7 @@ from keras.models import Model
 from keras.layers import Dense, Activation, Convolution1D, MaxPooling1D, Flatten, Dropout, Input, Embedding
 from keras.optimizers import SGD
 from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import LabelBinarizer, LabelEncoder
 
 import datetime
 
@@ -24,7 +25,7 @@ dense_outputs = 256
 # Conv layer kernel size
 filter_kernels = [3, 4, 5]
 # Number of units in the final output layer. Number of classes.
-cat_output = 22
+cat_output = 236
 
 # Compile/fit params
 batch_size = 32
@@ -80,28 +81,36 @@ def mini_batch_generator(x, y, vocab, vocab_size, vocab_check, maxlen,
 
 
 def shuffle_matrix(x, y):
-    # Convert x and y to dictionary, whose key is the index string, and value
-    # is the value of x and y.
-    x_dictionary = dict([(str(index), value) for index, value in x.items()])
-    y_dictionary = dict([(str(index), value) for index, value in y.items()])
+    # # Convert x and y to dictionary, whose key is the index string, and value
+    # # is the value of x and y.
+    # x_dictionary = dict([(str(index), value) for index, value in x.items()])
+    # y_dictionary = dict([(str(index), value) for index, value in y.items()])
+    #
+    # # List of index to be shuffled.
+    # z = list(x_dictionary.keys())
+    # np.random.shuffle(z)
+    #
+    # shuffled_x_dict = {}
+    # shuffled_y_dict = {}
+    #
+    # for i in z:
+    #     key_i = str(i)
+    #     shuffled_x_dict[key_i] = x_dictionary[key_i]
+    #     shuffled_y_dict[key_i] = y_dictionary[key_i]
+    #
+    # # Convert dictionaries to pandans Series.
+    # shuffled_x_dict_series = pd.Series(shuffled_x_dict)
+    # shuffled_y_dict_series = pd.Series(shuffled_y_dict)
+    #
+    # return shuffled_x_dict_series, shuffled_y_dict_series
 
-    # List of index to be shuffled.
-    z = list(x_dictionary.keys())
-    np.random.shuffle(z)
+    print (x.shape, y.shape)
+    stacked = np.hstack((np.matrix(x), y))
+    np.random.shuffle(stacked)
+    xi = np.array(stacked[:, 0]).flatten()
+    yi = np.array(stacked[:, 1:])
 
-    shuffled_x_dict = {}
-    shuffled_y_dict = {}
-
-    for i in z:
-        key_i = str(i)
-        shuffled_x_dict[key_i] = x_dictionary[key_i]
-        shuffled_y_dict[key_i] = y_dictionary[key_i]
-
-    # Convert dictionaries to pandans Series.
-    shuffled_x_dict_series = pd.Series(shuffled_x_dict)
-    shuffled_y_dict_series = pd.Series(shuffled_y_dict)
-
-    return shuffled_x_dict_series, shuffled_y_dict_series
+    return xi, yi
 
 
 def model(filter_kernels, dense_outputs, maxlen, vocab_size, nb_filter,
@@ -124,11 +133,11 @@ def model(filter_kernels, dense_outputs, maxlen, vocab_size, nb_filter,
 
     # conv3 = Convolution1D(nb_filter=nb_filter, filter_length=filter_kernels[3],
     #                       border_mode='valid', activation='relu')(conv2)
-
+    #
     # conv4 = Convolution1D(nb_filter=nb_filter, filter_length=filter_kernels[4],
     #                       border_mode='valid', activation='relu')(conv3)
-
-    # conv5 = Convolution1D(nb_filter=nb_filter, filter_length=filter_kernels[5],---------
+    #
+    # conv5 = Convolution1D(nb_filter=nb_filter, filter_length=filter_kernels[5],
     #                       border_mode='valid', activation='relu')(conv4)
     conv5 = MaxPooling1D(pool_length=3)(conv2)
     conv = Flatten()(conv)
@@ -154,9 +163,18 @@ def preprocess(df):
     result_df = result_df.replace(to_replace=' ', value='_', regex=True)
 
     X = result_df['Text']
-    Y = result_df['ID']
+
+    le = LabelEncoder()
+    enc = LabelBinarizer()
+
+    result_df['ID'] = le.fit_transform(result_df['ID'])
+    enc.fit(list(result_df['ID']))
+
+    Y = enc.transform(list(result_df['ID']))
 
     X_train, X_test, y_train, y_test = train_test_split(X, Y, random_state=1)
+
+    print(y_train)
 
     return X_train, X_test, y_train, y_test
 
@@ -164,9 +182,11 @@ def preprocess(df):
 print("reading file")
 raw_train_df = pd.read_csv(
     SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID', 'Text'])
-vocab, reverse_vocab, vocab_size, check = create_vocab_set()
+
 print("preprocessing")
 X_train, X_test, y_train, y_test = preprocess(raw_train_df)
+
+vocab, reverse_vocab, vocab_size, check = create_vocab_set()
 
 print("building model...")
 model = model(filter_kernels, dense_outputs, maxlen, vocab_size,
@@ -176,8 +196,11 @@ print("fitting model...")
 initial = datetime.datetime.now()
 
 for e in range(nb_epoch):
-    xi, yi = shuffle_matrix(X_train, y_train)
-    xi_test, yi_test = shuffle_matrix(X_test, y_test)
+    # xi, yi = shuffle_matrix(X_train, y_train)
+    # xi_test, yi_test = shuffle_matrix(X_test, y_test)
+
+    xi, yi = X_train, y_train
+    xi_test, yi_test = X_test, y_test
 
     batches = mini_batch_generator(xi, yi, vocab, vocab_size,
                                    check, maxlen,
