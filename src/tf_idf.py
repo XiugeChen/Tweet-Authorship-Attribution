@@ -532,6 +532,17 @@ preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
 print("####INFO: Finsih preprocess")
 cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False)
 
+# models
+models = [svm.LinearSVC(C=0.68, max_iter=1000),
+          SGDClassifier(loss="hinge", penalty="l2", max_iter=1000, n_jobs=-1, tol=1e-4),
+          LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
+          KNeighborsClassifier(n_neighbors=5)]
+
+titles = ['LinearSVM',
+          'SGDClassifier',
+          'LogisticRegression',
+          'KNN']
+
 print("####INFO: feature combination b")
 preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
 print("####INFO: Finsih preprocess")
