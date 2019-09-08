@@ -7,6 +7,25 @@ from nltk.tokenize import TweetTokenizer
 from nltk.stem import WordNetLemmatizer
 from nltk.corpus import stopwords
 from nltk.corpus import wordnet
+    
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfTransformer
+from sklearn.preprocessing import normalize
+from sklearn import svm
+from sklearn.naive_bayes import MultinomialNB
+from sklearn.linear_model import LogisticRegression
+from sklearn.model_selection import KFold
+from sklearn.metrics import accuracy_score
+
+from scipy import sparse
+
+from gensim.models import Word2Vec
+from gensim.models import KeyedVectors
+
+from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
+from xgboost import XGBClassifier
+
+import csv
 
 TRAIN_FILE = "../resources/data/train_tweets.txt"
 SML_TRAIN_FILE = "../resources/data/test.txt"
@@ -19,16 +38,16 @@ GLOVE_200D = "../resources/glove/glove.twitter.27B.200d.txt"
 #nltk.download('wordnet')
 #nltk.download('stopwords')
 
-# remove all RTs (reweets)
 def filter_RT(df):
+    """remove all RTs (reweets)"""
     rt = df['Text'].str.startswith('RT @handle')
     not_rt = [not i for i in rt]
     result_df = df[not_rt]
     result_df = result_df.reset_index(drop=True)
     return result_df
     
-# remove special terms like "@handle", links
 def rmv_special_term(df, rmv_all_spec=False):
+    """remove special terms like "@handle", links"""
     # remove @s
     result_df = df.replace(to_replace ='@handle', value = '@handle', regex=True)
     # remove # but save tags
@@ -155,20 +174,9 @@ def get_word_ngram(raw_word_list, ngram=[1]):
                     result = np.append(result, new_tag)
     
     return result
-    
-from sklearn.feature_extraction.text import CountVectorizer
-from sklearn.feature_extraction.text import TfidfTransformer
-from sklearn.preprocessing import normalize
 
-from scipy import sparse
-
-from gensim.models import Word2Vec
-from gensim.models import KeyedVectors
-
-from vaderSentiment.vaderSentiment import SentimentIntensityAnalyzer
-
-# merge all tweets from same user
 def merge_tweets(df):
+    """merge all tweets from same user"""
     df['Text'] = df['Text'].apply(lambda x: ''.join(i + ' ' for i in x))
     
     aggregation_functions = {'Text': ''.join}
@@ -178,8 +186,8 @@ def merge_tweets(df):
     print("finish merge tweets")
     return result_df
     
-# extract tf-idf features
 def tf_idf(train_df, test_df):
+    """extract tf-idf features"""
     #get the text column 
     train_docs = train_df['Text'].tolist()
     test_docs = test_df['Text'].tolist()
@@ -199,8 +207,8 @@ def tf_idf(train_df, test_df):
 
     return tfidf_train_df, tfidf_test_df
 
-# add lexicon features
 def add_lexicon_features(df, feature_vec=None):
+    """add lexicon features"""
     features = []
     for index, row in df.iterrows():
         text, feature = row['Text'], []
@@ -222,8 +230,10 @@ def add_lexicon_features(df, feature_vec=None):
         print("finish add lexicon features")
         return feature_vec
 
-# caculate averge word length for given sentence (word should starts with alphabet letters)
 def avg_var_word_len(text):
+    """caculate averge word length for given sentence (word should starts 
+    with alphabet letters)
+    """
     words, length = text.split(' '), []
     
     for word in words:
@@ -237,8 +247,9 @@ def avg_var_word_len(text):
     
     return [np.mean(length), np.std(length), np.median(length)]
     
-# generate substring for df
+
 def generate_substring(df, length=6):
+    """generate substring for df"""
     iter_df = df.copy()
     
     for index, row in iter_df.iterrows():
@@ -262,8 +273,9 @@ def generate_substring(df, length=6):
     
 analyser = SentimentIntensityAnalyzer()
 
-# sentiment analysis
+
 def sentiment_analysis(df, feature_vec=None):
+    """sentiment analysis"""
     sentiment_scores = []
     for index, row in df.iterrows():
         text, ori_words = row['Text'], []
@@ -293,15 +305,6 @@ def sentiment_analysis(df, feature_vec=None):
         #print("finish add sentiment features")
         return feature_vec
     
-from sklearn import svm
-from sklearn.naive_bayes import MultinomialNB
-from sklearn.linear_model import LogisticRegression
-from xgboost import XGBClassifier
-
-from sklearn.model_selection import KFold
-from sklearn.metrics import accuracy_score
-
-import csv
 
 # models
 models = [svm.LinearSVC(C=0.68, max_iter=1000)]
