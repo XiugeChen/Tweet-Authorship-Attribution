@@ -28,4 +28,5 @@ def extract_users_from_source(number_of_users=100):
 
 
 extract_users_from_source()
+extract_users_from_source(200)
 extract_users_from_source(500)
