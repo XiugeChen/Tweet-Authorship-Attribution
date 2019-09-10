@@ -39,11 +39,6 @@ extract_users_from_source(200)
 extract_users_from_source(500)
 extract_users_from_source(1000)
 
-<<<<<<< HEAD
-TRAIN_FILE = "../resources/data/train_tweets.txt"
-SML_TRAIN_FILE = "../resources/data/50_train_tweets.txt"
-TEST_FILE = "../resources/data/test_tweets_unlabeled.txt"
-=======
 DATA_FOLDER = "../resources/data/"
 TRAIN_FILE_NAME = "train_tweets.txt"
 
@@ -51,7 +46,6 @@ TRAIN_FILE = DATA_FOLDER + TRAIN_FILE_NAME
 
 SML_TRAIN_FILE = DATA_FOLDER + "test.txt"
 TEST_FILE = DATA_FOLDER + "test_tweets_unlabeled.txt"
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
 
 GLOVE_25D = "../resources/glove/glove.twitter.27B.25d.txt"
 GLOVE_200D = "../resources/glove/glove.twitter.27B.200d.txt"
@@ -391,23 +385,19 @@ def sentiment_analysis(df, feature_vec=None):
         #print("finish add sentiment features")
         return feature_vec
 
-<<<<<<< HEAD
 # models
-models = [#svm.LinearSVC(C=0.68, max_iter=1000),
-          SGDClassifier(loss="hinge", penalty="l2", max_iter=10000, n_jobs=-1, tol=1e-4)]
+models = [svm.LinearSVC(C=0.68, max_iter=1000, tol=1e-6),
+          SGDClassifier(loss="hinge", penalty="l2", max_iter=10000, n_jobs=-1, tol=1e-6)]
           #LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
           #MultinomialNB(),
           #KNeighborsClassifier(n_neighbors=5)]
 
-titles = [#'LinearSVM',
+titles = ['LinearSVM',
           'SGDClassifier']
           #'LogisticRegression',
           #'MNB',
           #'KNN']
           
-=======
-
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
 def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
 
@@ -510,18 +500,10 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
         model.fit(X_train, y_train)
         print("model " + title + " fit finished")
         label = model.predict(X_test)
-<<<<<<< HEAD
         print("model predict finished")
     
         wtr = csv.writer(open('prediction_' + title + '.csv', 'w'), delimiter=',', lineterminator='\n')
         wtr.writerow(['Id','Predicted'])
-=======
-        #print("model predict finished")
-
-        wtr = csv.writer(open('prediction_' + title + '.csv',
-                              'w'), delimiter=',', lineterminator='\n')
-        wtr.writerow(['Id', 'Predicted'])
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
         for i in range(0, label.size):
             wtr.writerow([i+1, label[i]])
 
@@ -531,7 +513,6 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
 
 
 def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1):
-<<<<<<< HEAD
     train_df = preprocess(train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
     test_df = preprocess(test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
     
@@ -547,25 +528,6 @@ def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], ad
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
     
     print("fit started")
-=======
-    train_df = preprocess(train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False,
-                          lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
-    test_df = preprocess(test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False,
-                         lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
-
-    train_df['Text'] = train_df['Text'].apply(
-        lambda x: ''.join(i + ' ' for i in x).rstrip())
-    test_df['Text'] = test_df['Text'].apply(
-        lambda x: ''.join(i + ' ' for i in x).rstrip())
-
-    X_train, X_test = tf_idf(train_df, test_df, min_df=min_tf_idf)
-    y_train, y_test = train_df['ID'], test_df['ID']
-
-    if addsentiment:
-        X_train = sentiment_analysis(train_df, feature_vec=X_train)
-        X_test = sentiment_analysis(test_df, feature_vec=X_test)
-
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
     model.fit(X_train, y_train)
     print("fit finished")
     train_labels = model.predict(X_train)
@@ -583,31 +545,16 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         train_df, test_df = raw_df.iloc[train_index].reset_index(
             drop=True), raw_df.iloc[test_index].reset_index(drop=True)
         y_train, y_test = train_df['ID'], test_df['ID']
-<<<<<<< HEAD
         
         sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=100000, n_jobs=-1, tol=1e-6)
-        svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
+        svm_model = svm.LinearSVC(C=0.68, max_iter=1000, tol=1e-6)
         
         train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
         train_2, test_2 = predict(sgd_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
         train_3, test_3 = predict(sgd_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1,1000], addsentiment=True, min_tf_idf=1)
         
         h_model = svm.LinearSVC(C=0.9, max_iter=1000)
-        
-=======
 
-        svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
-
-        train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[
-                                  1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
-        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[
-                                  1, 2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
-        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[
-                                  1], pos=True, posngram=[1000], addsentiment=True, min_tf_idf=1)
-
-        h_model = svm.LinearSVC(C=0.68, max_iter=1000)
-
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
         X_train, X_test = [], []
         for i in range(0, len(train_1)):
             X_train.append(str(train_1[i]) + ' ' +
@@ -620,12 +567,8 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         X_test = np.array(X_test)
 
         stop_words = stopwords.words('english')
-<<<<<<< HEAD
+
         cv = CountVectorizer(max_df=0.57, stop_words=stop_words, decode_error='ignore')
-=======
-        cv = CountVectorizer(
-            max_df=0.85, stop_words=stop_words, decode_error='ignore')
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
         trian_wc_vec = cv.fit_transform(X_train)
         test_wc_vec = cv.transform(X_test)
 
@@ -639,23 +582,12 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
 
         predicted_labels = h_model.predict(X_test)
         acc = accuracy_score(predicted_labels, y_test)
-<<<<<<< HEAD
         
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(train_1, y_train), accuracy_score(train_2, y_train), accuracy_score(train_3, y_train)
         #print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(test_1, y_test), accuracy_score(test_2, y_test), accuracy_score(test_3, y_test)
         print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
-        
-=======
 
-        sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(train_1, y_train), accuracy_score(
-            train_2, y_train), accuracy_score(train_3, y_train)
-        # print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
-        sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(
-            test_1, y_test), accuracy_score(test_2, y_test), accuracy_score(test_3, y_test)
-        # print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
-
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
         # uncomment to print miss labeled data
         # for i in range(0, len(predicted_labels)):
         #   if predicted_labels[i] != y_test[i]:
@@ -665,7 +597,6 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
 
     avg_acc = score / 10
     print("####INFO: trainning", 'Stacking', avg_acc)
-<<<<<<< HEAD
     
 def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
     train_df, test_df = raw_train_df, raw_test_df
@@ -712,10 +643,6 @@ def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
         
     return
     
-=======
-
-
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
 # test
 pd.options.mode.chained_assignment = None
 
@@ -729,11 +656,7 @@ print("Finish reading")
 #preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1,1000])
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
-<<<<<<< HEAD
 print("Finsih preprocess")
-=======
-# print("Finish preprocess")
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
 # cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
 
 #stacking_cross_validate(raw_train_df, add_sentiment=True)
@@ -741,23 +664,14 @@ stacking_predict(raw_train_df, raw_test_df, add_sentiment=True)
 
 #predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
 # print("finished")
-<<<<<<< HEAD
+
 '''
 user200_file = "../resources/data/200_train_tweets.txt"
 
 raw_train_df = pd.read_csv(user200_file, delimiter='\t', header=None, names=['ID','Text'])
 print("####INFO: Finish reading")
 
-print("####INFO: feature combination a")
-preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1])
-print("####INFO: Finsih preprocess")
-cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False)
-
-=======
-
-"""
 print("\n####INFO: Running experiment one")
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
 # models
 # models = [svm.LinearSVC(C=0.68, max_iter=1000, class_weight=class_weight),
 models = [svm.LinearSVC(C=0.68, max_iter=1000),
@@ -824,12 +738,7 @@ cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True,
                         substring=True, substring_len=3, add_sentiment=True, pca=False)
 
 stacking_cross_validate(raw_train_df, add_sentiment=True)
-<<<<<<< HEAD
-'''
-=======
 print("\n####INFO: Experiment one finished")
-"""
-
 
 print("\n####INFO: Running experiment two")
 
@@ -862,4 +771,4 @@ for file_name in source_file_list:
     print("####INFO: Finish preprocess")
     cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
                           substring=False, substring_len=3, add_sentiment=True, pca=False)
->>>>>>> 416a5ffd5cb0bd74647e08aa137c5fd5056d314f
+'''
