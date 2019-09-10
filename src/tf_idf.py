@@ -40,7 +40,7 @@ extract_users_from_source(500)
 extract_users_from_source(1000)
 
 TRAIN_FILE = "../resources/data/train_tweets.txt"
-SML_TRAIN_FILE = "../resources/data/test.txt"
+SML_TRAIN_FILE = "../resources/data/50_train_tweets.txt"
 TEST_FILE = "../resources/data/test_tweets_unlabeled.txt"
 
 GLOVE_25D = "../resources/glove/glove.twitter.27B.25d.txt"
@@ -319,17 +319,17 @@ def sentiment_analysis(df, feature_vec=None):
     
 
 # models
-models = [svm.LinearSVC(C=0.68, max_iter=1000),
-          SGDClassifier(loss="hinge", penalty="l2", max_iter=1000, n_jobs=-1, tol=1e-4),
-          LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
-          MultinomialNB(),
-          KNeighborsClassifier(n_neighbors=5)]
+models = [#svm.LinearSVC(C=0.68, max_iter=1000),
+          SGDClassifier(loss="hinge", penalty="l2", max_iter=10000, n_jobs=-1, tol=1e-4)]
+          #LogisticRegression(solver="lbfgs", penalty="l2", C=0.68, multi_class='auto', max_iter=1000, fit_intercept= False),
+          #MultinomialNB(),
+          #KNeighborsClassifier(n_neighbors=5)]
 
-titles = ['LinearSVM',
-          'SGDClassifier',
-          'LogisticRegression',
-          'MNB',
-          'KNN']
+titles = [#'LinearSVM',
+          'SGDClassifier']
+          #'LogisticRegression',
+          #'MNB',
+          #'KNN']
           
 def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False, pca=False):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
@@ -411,11 +411,11 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
     
     for title, model in zip(titles, models):
-        #print("start training")
+        print("start training")
         model.fit(X_train, y_train)
-        #print("model " + title + " fit finished")
+        print("model " + title + " fit finished")
         label = model.predict(X_test)
-        #print("model predict finished")
+        print("model predict finished")
     
         wtr = csv.writer(open('prediction_' + title + '.csv', 'w'), delimiter=',', lineterminator='\n')
         wtr.writerow(['Id','Predicted'])
@@ -432,15 +432,19 @@ def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], ad
     train_df['Text'] = train_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     test_df['Text'] = test_df['Text'].apply(lambda x: ''.join(i + ' ' for i in x).rstrip())
     
+    print("feature extraction started")
     X_train, X_test = tf_idf(train_df, test_df, min_df=min_tf_idf)
-    y_train, y_test = train_df['ID'], test_df['ID']
+    y_train = train_df['ID']
     
     if addsentiment:
         X_train = sentiment_analysis(train_df, feature_vec=X_train)
         X_test = sentiment_analysis(test_df, feature_vec=X_test)
-        
+    
+    print("fit started")
     model.fit(X_train, y_train)
+    print("fit finished")
     train_labels = model.predict(X_train)
+    print("predict started")
     predicted_labels = model.predict(X_test)
     
     return np.array(train_labels).reshape(-1,1), np.array(predicted_labels).reshape(-1,1)
@@ -453,13 +457,14 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         train_df, test_df = raw_df.iloc[train_index].reset_index(drop=True), raw_df.iloc[test_index].reset_index(drop=True)
         y_train, y_test = train_df['ID'], test_df['ID']
         
+        sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=100000, n_jobs=-1, tol=1e-6)
         svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
         
         train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
-        train_2, test_2 = predict(svm_model, train_df, test_df, wordngram=[1,2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
-        train_3, test_3 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1000], addsentiment=True, min_tf_idf=1)
+        train_2, test_2 = predict(sgd_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
+        train_3, test_3 = predict(sgd_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1,1000], addsentiment=True, min_tf_idf=1)
         
-        h_model = svm.LinearSVC(C=0.68, max_iter=1000)
+        h_model = svm.LinearSVC(C=0.9, max_iter=1000)
         
         X_train, X_test = [], []
         for i in range(0, len(train_1)):
@@ -471,7 +476,7 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         X_test = np.array(X_test)
         
         stop_words = stopwords.words('english')
-        cv = CountVectorizer(max_df=0.85, stop_words=stop_words, decode_error='ignore')
+        cv = CountVectorizer(max_df=0.57, stop_words=stop_words, decode_error='ignore')
         trian_wc_vec = cv.fit_transform(X_train)
         test_wc_vec = cv.transform(X_test)
     
@@ -489,7 +494,7 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(train_1, y_train), accuracy_score(train_2, y_train), accuracy_score(train_3, y_train)
         #print("####INFO train error: ", train_acc, sub_acc_1, sub_acc_2, sub_acc_3)
         sub_acc_1, sub_acc_2, sub_acc_3 = accuracy_score(test_1, y_test), accuracy_score(test_2, y_test), accuracy_score(test_3, y_test)
-        #print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
+        print("####INFO test error: ", acc, sub_acc_1, sub_acc_2, sub_acc_3)
         
         # uncomment to print miss labeled data
         # for i in range(0, len(predicted_labels)):
@@ -501,27 +506,73 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
     avg_acc = score / 10
     print("####INFO: trainning", 'Stacking', avg_acc)
     
+def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
+    train_df, test_df = raw_train_df, raw_test_df
+    y_train = train_df['ID']
+    
+    sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=100000, n_jobs=-1, tol=1e-6)
+    svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
+        
+    train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
+    train_2, test_2 = predict(sgd_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
+    train_3, test_3 = predict(sgd_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1,1000], addsentiment=True, min_tf_idf=1)
+        
+    h_model = svm.LinearSVC(C=0.9, max_iter=1000)
+    
+    X_train, X_test = [], []
+    for i in range(0, len(train_1)):
+        X_train.append(str(train_1[i]) + ' ' + str(train_2[i]) + ' ' + str(train_3[i]))
+    for i in range(0, len(test_1)):
+        X_test.append(str(test_1[i]) + ' ' + str(test_2[i]) + ' ' + str(test_3[i]))
+        
+    X_train = np.array(X_train)
+    X_test = np.array(X_test)
+        
+    stop_words = stopwords.words('english')
+    cv = CountVectorizer(max_df=0.57, stop_words=stop_words, decode_error='ignore')
+    trian_wc_vec = cv.fit_transform(X_train)
+    test_wc_vec = cv.transform(X_test)
+    
+    # get tfidf
+    transformer = TfidfTransformer(smooth_idf=True, use_idf=True)
+    X_train = transformer.fit_transform(trian_wc_vec)
+    X_test = transformer.transform(test_wc_vec)
+    
+    print("start stacking fitting")
+    h_model.fit(X_train, y_train)
+    print("model fit finished")
+    predicted_labels = h_model.predict(X_test)
+    print("model predict finished")
+    
+    wtr = csv.writer(open('prediction_' + 'stacking' + '.csv', 'w'), delimiter=',', lineterminator='\n')
+    wtr.writerow(['Id','Predicted'])
+    for i in range(0, predicted_labels.size):
+        wtr.writerow([i+1, predicted_labels[i]])
+        
+    return
+    
 # test
 pd.options.mode.chained_assignment = None
 
-# raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
-# raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
+raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
 
-# print("Finish reading")
-# preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
-# preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+print("Finish reading")
+#preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1,1000])
+#preprocess_test_df = preprocess(raw_test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1,1000])
 #print(preprocess_train_df.shape, preprocess_test_df.shape)
 
-# print("Finsih preprocess")
+print("Finsih preprocess")
 # cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
 
 #stacking_cross_validate(raw_train_df, add_sentiment=True)
+stacking_predict(raw_train_df, raw_test_df, add_sentiment=True)
 
-# predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
+#predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
 # print("finished")
-
+'''
 user200_file = "../resources/data/200_train_tweets.txt"
 
 raw_train_df = pd.read_csv(user200_file, delimiter='\t', header=None, names=['ID','Text'])
@@ -564,3 +615,4 @@ print("####INFO: Finsih preprocess")
 cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True, substring=True, substring_len=3, add_sentiment=True, pca=False)
 
 stacking_cross_validate(raw_train_df, add_sentiment=True)
+'''
