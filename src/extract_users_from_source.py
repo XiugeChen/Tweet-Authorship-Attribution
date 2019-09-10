@@ -21,7 +21,8 @@ def extract_users_from_source(number_of_users=100):
                 if user_id not in users_extracted:
                     users_extracted.append(user_id)
 
-                if (len(users_extracted) >= number_of_users):
+                if (len(users_extracted) > number_of_users):
+                    # print("len(users_extracted)", len(users_extracted))
                     return
 
                 target_file.write(row)
