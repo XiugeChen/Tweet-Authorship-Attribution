@@ -90,8 +90,8 @@ def calculate_class_weight(raw_train_df):
     return class_weight
 
 
-class_weight = calculate_class_weight(raw_train_df)
-print("####INFO: Finish class weight calculation")
+# class_weight = calculate_class_weight(raw_train_df)
+# print("####INFO: Finish class weight calculation")
 
 
 def filter_RT(df):
@@ -423,16 +423,16 @@ def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, s
         if pca:
             X_train, X_test = pca_reduction(X_train, X_test)
 
-        print("X_train.shape")
-        print(X_train.shape)
+        # print("X_train.shape")
+        # print(X_train.shape)
 
-        print("y_train.shape")
-        print(y_train.shape)
+        # print("y_train.shape")
+        # print(y_train.shape)
 
-        print("y_train.unique()")
-        print(y_train.unique())
+        # print("y_train.unique()")
+        # print(y_train.unique())
 
-        print("len(y_train.unique())", len(y_train.unique()))
+        # print("len(y_train.unique())", len(y_train.unique()))
 
         for title, model in zip(titles, models):
             #print("Start train " + title)
@@ -613,108 +613,106 @@ pd.options.mode.chained_assignment = None
 # predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
 # print("finished")
 
+"""
+print("\n####INFO: Running experiment one")
+# models
+# models = [svm.LinearSVC(C=0.68, max_iter=1000, class_weight=class_weight),
+models = [svm.LinearSVC(C=0.68, max_iter=1000),
+            SGDClassifier(loss="hinge", penalty="l2",
+                        max_iter=1000, n_jobs=-1, tol=1e-4),
+            LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
+                                multi_class='auto', max_iter=1000, fit_intercept=False),
+            MultinomialNB(),
+            KNeighborsClassifier(n_neighbors=5)]
 
-def run_experiment_one():
-    # models
-    # models = [svm.LinearSVC(C=0.68, max_iter=1000, class_weight=class_weight),
-    models = [svm.LinearSVC(C=0.68, max_iter=1000),
-              SGDClassifier(loss="hinge", penalty="l2",
-                            max_iter=1000, n_jobs=-1, tol=1e-4),
-              LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
-                                 multi_class='auto', max_iter=1000, fit_intercept=False),
-              MultinomialNB(),
-              KNeighborsClassifier(n_neighbors=5)]
+titles = ['LinearSVM',
+            'SGDClassifier',
+            'LogisticRegression',
+            'MNB',
+            'KNN']
 
-    titles = ['LinearSVM',
-              'SGDClassifier',
-              'LogisticRegression',
-              'MNB',
-              'KNN']
+print("\n####INFO: feature combination a")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
+                                    rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1])
+print("####INFO: Finish preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
+                        substring=False, substring_len=3, add_sentiment=False, pca=False)
 
-    print("\n####INFO: Running experiment one")
-    print("\n####INFO: feature combination a")
-    preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
-                                     rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1])
-    print("####INFO: Finish preprocess")
-    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
-                          substring=False, substring_len=3, add_sentiment=False, pca=False)
+# create models again, as naive bayesian does not support negative number.
+# models = [svm.LinearSVC(C=0.68, max_iter=1000, class_weight=class_weight),
+models = [svm.LinearSVC(C=0.68, max_iter=1000),
+            SGDClassifier(loss="hinge", penalty="l2",
+                        max_iter=1000, n_jobs=-1, tol=1e-4),
+            LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
+                                multi_class='auto', max_iter=1000, fit_intercept=False),
+            KNeighborsClassifier(n_neighbors=5)]
 
-    # create models again, as naive bayesian does not support negative number.
-    # models = [svm.LinearSVC(C=0.68, max_iter=1000, class_weight=class_weight),
-    models = [svm.LinearSVC(C=0.68, max_iter=1000),
-              SGDClassifier(loss="hinge", penalty="l2",
-                            max_iter=1000, n_jobs=-1, tol=1e-4),
-              LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
-                                 multi_class='auto', max_iter=1000, fit_intercept=False),
-              KNeighborsClassifier(n_neighbors=5)]
+titles = ['LinearSVM',
+            'SGDClassifier',
+            'LogisticRegression',
+            'KNN']
 
-    titles = ['LinearSVM',
-              'SGDClassifier',
-              'LogisticRegression',
-              'KNN']
+print("\n####INFO: feature combination b")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
+                                    rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
+print("####INFO: Finish preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
+                        substring=False, substring_len=3, add_sentiment=True, pca=False)
 
-    print("\n####INFO: feature combination b")
+print("\n####INFO: feature combination c")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
+                                    rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
+print("####INFO: Finish preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
+                        substring=False, substring_len=3, add_sentiment=True, pca=False)
+
+print("\n####INFO: feature combination d")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
+                                    rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
+print("####INFO: Finish preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
+                        substring=True, substring_len=3, add_sentiment=True, pca=False)
+
+print("\n####INFO: feature combination e")
+preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
+                                    rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
+print("####INFO: Finish preprocess")
+cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True,
+                        substring=True, substring_len=3, add_sentiment=True, pca=False)
+
+stacking_cross_validate(raw_train_df, add_sentiment=True)
+print("\n####INFO: Experiment one finished")
+"""
+
+
+print("\n####INFO: Running experiment two")
+
+target_data_size_list = [50, 100, 200, 500, 1000]
+source_file_list = []
+
+for target_data_size in target_data_size_list:
+    source_file_list.append("{0}{1}_{2}".format(
+        DATA_FOLDER, target_data_size, TRAIN_FILE_NAME))
+
+print("source_file_list")
+print(source_file_list)
+
+models = [svm.LinearSVC(C=0.68, max_iter=1000),
+          SGDClassifier(loss="hinge", penalty="l2",
+                        max_iter=1000, n_jobs=-1, tol=1e-4),
+          LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
+                             multi_class='auto', max_iter=1000, fit_intercept=False),
+          KNeighborsClassifier(n_neighbors=5)]
+
+titles = ['LinearSVM', 'SGDClassifier', 'LogisticRegression', 'KNN']
+
+for file_name in source_file_list:
+    raw_train_df = pd.read_csv(
+        file_name, delimiter='\t', header=None, names=['ID', 'Text'])
+    print(
+        "\n####INFO: feature combination b, file name: {0}".format(file_name))
     preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
                                      rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
     print("####INFO: Finish preprocess")
     cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
                           substring=False, substring_len=3, add_sentiment=True, pca=False)
-
-    print("\n####INFO: feature combination c")
-    preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
-                                     rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
-    print("####INFO: Finish preprocess")
-    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
-                          substring=False, substring_len=3, add_sentiment=True, pca=False)
-
-    print("\n####INFO: feature combination d")
-    preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
-                                     rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
-    print("####INFO: Finish preprocess")
-    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
-                          substring=True, substring_len=3, add_sentiment=True, pca=False)
-
-    print("\n####INFO: feature combination e")
-    preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
-                                     rmv_stop=False, lemmatize=False, word_ngram=[1, 2], add_pos=True, pos_ngram=[1, 1000])
-    print("####INFO: Finish preprocess")
-    cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=True,
-                          substring=True, substring_len=3, add_sentiment=True, pca=False)
-
-    stacking_cross_validate(raw_train_df, add_sentiment=True)
-
-# run_experiment_one()
-
-
-def run_experiment_two():
-    print("\n####INFO: Running experiment two")
-
-    target_data_size_list = [50, 100, 200, 500, 1000]
-    source_file_list = []
-
-    for target_data_size in target_data_size_list:
-        source_file_list.append("{0}{1}_{2}".format(
-            DATA_FOLDER, target_data_size, TRAIN_FILE_NAME))
-
-    models = [svm.LinearSVC(C=0.68, max_iter=1000),
-              SGDClassifier(loss="hinge", penalty="l2",
-                            max_iter=1000, n_jobs=-1, tol=1e-4),
-              LogisticRegression(solver="lbfgs", penalty="l2", C=0.68,
-                                 multi_class='auto', max_iter=1000, fit_intercept=False),
-              KNeighborsClassifier(n_neighbors=5)]
-
-    titles = ['LinearSVM', 'SGDClassifier', 'LogisticRegression', 'KNN']
-
-    for file_name in source_file_list:
-        raw_train_df = pd.read_csv(
-            file_name, delimiter='\t', header=None, names=['ID', 'Text'])
-        print(
-            "\n####INFO: feature combination b, file name: {0}".format(file_name))
-        preprocess_train_df = preprocess(raw_train_df, rmv_rt=False, rmv_all_spec=False,
-                                         rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=True, pos_ngram=[1])
-        print("####INFO: Finish preprocess")
-        cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False,
-                              substring=False, substring_len=3, add_sentiment=True, pca=False)
-
-
-run_experiment_two()
