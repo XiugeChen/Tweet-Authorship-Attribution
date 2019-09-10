@@ -1,0 +1,40 @@
+####INFO: Finish reading
+
+####INFO: Running experiment two
+source_file_list
+['../resources/data/50_train_tweets.txt', '../resources/data/100_train_tweets.txt', '../resources/data/200_train_tweets.txt', '../resources/data/500_train_tweets.txt', '../resources/data/1000_train_tweets.txt']
+
+####INFO: feature combination b, file name: ../resources/data/50_train_tweets.txt
+####INFO: Finish preprocess
+####INFO: trainning LinearSVM 0.5450550655960686
+####INFO: trainning SGDClassifier 0.5230134702294765
+####INFO: trainning LogisticRegression 0.3484928261155719
+####INFO: trainning KNN 0.3489908297134834
+
+####INFO: feature combination b, file name: ../resources/data/100_train_tweets.txt
+####INFO: Finish preprocess
+####INFO: trainning LinearSVM 0.5250500200080032
+####INFO: trainning SGDClassifier 0.52074368208822
+####INFO: trainning LogisticRegression 0.3366623572505925
+####INFO: trainning KNN 0.23304911708273052
+
+####INFO: feature combination b, file name: ../resources/data/200_train_tweets.txt
+####INFO: Finish preprocess
+####INFO: trainning LinearSVM 0.45866397112140983
+####INFO: trainning SGDClassifier 0.44994929432411696
+####INFO: trainning LogisticRegression 0.2563946950828631
+####INFO: trainning KNN 0.30375208865348846
+
+####INFO: feature combination b, file name: ../resources/data/500_train_tweets.txt
+####INFO: Finish preprocess
+####INFO: trainning LinearSVM 0.4275592653848805
+####INFO: trainning SGDClassifier 0.3967295313713548
+####INFO: trainning LogisticRegression 0.2287834299049929
+####INFO: trainning KNN 0.23148589979270157
+
+####INFO: feature combination b, file name: ../resources/data/1000_train_tweets.txt
+####INFO: Finish preprocess
+####INFO: trainning LinearSVM 0.38850959483967673
+####INFO: trainning SGDClassifier 0.34369228346911934
+####INFO: trainning LogisticRegression 0.20038561083543444
+####INFO: trainning KNN 0.18758402842807573
