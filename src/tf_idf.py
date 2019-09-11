@@ -617,7 +617,7 @@ def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
 # test
 pd.options.mode.chained_assignment = None
 
-raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
 raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
