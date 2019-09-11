@@ -33,18 +33,18 @@ import csv
 from extract_users_from_source import extract_users_from_source
 
 # Extract certain number of users from the source file for experiments.
-extract_users_from_source(50)
-extract_users_from_source(100)
-extract_users_from_source(200)
-extract_users_from_source(500)
-extract_users_from_source(1000)
+# extract_users_from_source(50)
+# extract_users_from_source(100)
+# extract_users_from_source(200)
+# extract_users_from_source(500)
+# extract_users_from_source(1000)
 
 DATA_FOLDER = "../resources/data/"
 TRAIN_FILE_NAME = "train_tweets.txt"
 
 TRAIN_FILE = DATA_FOLDER + TRAIN_FILE_NAME
 
-SML_TRAIN_FILE = DATA_FOLDER + "test.txt"
+SML_TRAIN_FILE = DATA_FOLDER + "50_train_tweets.txt"
 TEST_FILE = DATA_FOLDER + "test_tweets_unlabeled.txt"
 
 GLOVE_25D = "../resources/glove/glove.twitter.27B.25d.txt"
@@ -53,18 +53,6 @@ GLOVE_200D = "../resources/glove/glove.twitter.27B.200d.txt"
 # nltk.download('averaged_perceptron_tagger')
 # nltk.download('wordnet')
 # nltk.download('stopwords')
-
-
-user200_file = DATA_FOLDER + "200_" + TRAIN_FILE_NAME
-
-raw_train_df = pd.read_csv(
-    user200_file, delimiter='\t', header=None, names=['ID', 'Text'])
-
-complete_train_df = pd.read_csv(
-    TRAIN_FILE, delimiter='\t', header=None, names=['ID', 'Text'])
-
-print("####INFO: Finish reading")
-
 
 def calculate_class_weight(raw_train_df):
     unique_users_id = raw_train_df["ID"].unique().tolist()
@@ -88,7 +76,6 @@ def calculate_class_weight(raw_train_df):
     # print("sum(class_weight.values())", sum(class_weight.values()))
 
     return class_weight
-
 
 # class_weight = calculate_class_weight(raw_train_df)
 # print("####INFO: Finish class weight calculation")
@@ -136,8 +123,6 @@ cached_stop_words = set(stopwords.words('english'))
 lemmatizer = WordNetLemmatizer()
 
 # main call
-
-
 def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=[1], add_pos=False, pos_ngram=[1]):
     logging.info('Preprocess starting')
 
@@ -178,8 +163,6 @@ def preprocess(df, rmv_rt=True, rmv_all_spec=False, rmv_stop=False, lemmatize=Fa
     return result_df
 
 # analysis POS (part of speech) and ngram
-
-
 def pos_analysis(word_list, ngram=[1]):
     if 0 in ngram:
         return word_list
@@ -213,8 +196,6 @@ def pos_analysis(word_list, ngram=[1]):
     return result
 
 # get word ngram
-
-
 def get_word_ngram(raw_word_list, ngram=[1]):
     result = []
     # get pure word list, eliminate pos tags
@@ -247,7 +228,6 @@ def get_word_ngram(raw_word_list, ngram=[1]):
                     result = np.append(result, new_tag)
 
     return result
-
 
 def merge_tweets(df):
     """merge all tweets from same user"""
@@ -283,7 +263,6 @@ def tf_idf(train_df, test_df, min_df=1):
 
     return tfidf_train_df, tfidf_test_df
 
-
 def add_lexicon_features(df, feature_vec=None):
     """add lexicon features"""
     features = []
@@ -307,7 +286,6 @@ def add_lexicon_features(df, feature_vec=None):
         #print("finish add lexicon features")
         return feature_vec
 
-
 def avg_var_word_len(text):
     """caculate averge word length for given sentence (word should starts 
     with alphabet letters)
@@ -324,7 +302,6 @@ def avg_var_word_len(text):
         return [0, 0, 0]
 
     return [np.mean(length), np.std(length), np.median(length)]
-
 
 def generate_substring(df, length=6):
     """generate substring for df"""
@@ -349,9 +326,7 @@ def generate_substring(df, length=6):
     #print("Finish substring extraction")
     return df
 
-
 analyser = SentimentIntensityAnalyzer()
-
 
 def sentiment_analysis(df, feature_vec=None):
     """sentiment analysis"""
@@ -468,7 +443,6 @@ def cross_validate_tf_idf(df, merge=False, add_lexicon=False, substring=False, s
         acc = scores[title] / 10
         print("####INFO: trainning", title, acc)
 
-
 def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=False):
     # merge all tweets from same user to one document string
     if merge:
@@ -510,8 +484,6 @@ def predict_tf_idf(train_df, test_df, merge=False, add_lexicon=False, substring=
     return
 
 # Helper functions for stacking
-
-
 def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1):
     train_df = preprocess(train_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
     test_df = preprocess(test_df, rmv_rt=False, rmv_all_spec=False, rmv_stop=False, lemmatize=False, word_ngram=wordngram, add_pos=pos, pos_ngram=posngram)
@@ -536,7 +508,6 @@ def predict(model, train_df, test_df, wordngram=[1], pos=False, posngram=[1], ad
 
     return np.array(train_labels).reshape(-1, 1), np.array(predicted_labels).reshape(-1, 1)
 
-
 def stacking_cross_validate(raw_df, add_sentiment=True):
     cv = KFold(n_splits=10, random_state=90051, shuffle=True)
 
@@ -546,7 +517,7 @@ def stacking_cross_validate(raw_df, add_sentiment=True):
             drop=True), raw_df.iloc[test_index].reset_index(drop=True)
         y_train, y_test = train_df['ID'], test_df['ID']
         
-        sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=100000, n_jobs=-1, tol=1e-6)
+        sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=10000, n_jobs=-1, tol=1e-6)
         svm_model = svm.LinearSVC(C=0.68, max_iter=1000, tol=1e-6)
         
         train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
@@ -602,14 +573,14 @@ def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
     train_df, test_df = raw_train_df, raw_test_df
     y_train = train_df['ID']
     
-    sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=100000, n_jobs=-1, tol=1e-6)
-    svm_model = svm.LinearSVC(C=0.68, max_iter=1000)
+    sgd_model = SGDClassifier(loss='hinge', penalty="l2", max_iter=10000, n_jobs=-1, tol=1e-6)
+    svm_model = svm.LinearSVC(C=1.1, max_iter=1000)
         
     train_1, test_1 = predict(svm_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1], addsentiment=True, min_tf_idf=1)
     train_2, test_2 = predict(sgd_model, train_df, test_df, wordngram=[2], pos=False, posngram=[1], addsentiment=True, min_tf_idf=1)
     train_3, test_3 = predict(sgd_model, train_df, test_df, wordngram=[1], pos=True, posngram=[1,1000], addsentiment=True, min_tf_idf=1)
         
-    h_model = svm.LinearSVC(C=0.9, max_iter=1000)
+    h_model = svm.LinearSVC(C=1.1, max_iter=1000)
     
     X_train, X_test = [], []
     for i in range(0, len(train_1)):
@@ -646,7 +617,7 @@ def stacking_predict(raw_train_df, raw_test_df, add_sentiment=True):
 # test
 pd.options.mode.chained_assignment = None
 
-raw_train_df = pd.read_csv(TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
+raw_train_df = pd.read_csv(SML_TRAIN_FILE, delimiter='\t', header=None, names=['ID','Text'])
 raw_test_df = pd.read_csv(TEST_FILE, delimiter='\t', header=None, names=['Text'])
 # print(train_df.shape)
 # print(test_df.shape)
@@ -659,7 +630,7 @@ print("Finish reading")
 print("Finsih preprocess")
 # cross_validate_tf_idf(preprocess_train_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True, pca=False)
 
-#stacking_cross_validate(raw_train_df, add_sentiment=True)
+stacking_cross_validate(raw_train_df, add_sentiment=True)
 stacking_predict(raw_train_df, raw_test_df, add_sentiment=True)
 
 #predict_tf_idf(preprocess_train_df, preprocess_test_df, merge=False, add_lexicon=False, substring=False, substring_len=3, add_sentiment=True)
