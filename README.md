@@ -8,6 +8,8 @@
 
 * Using mainly n-gram, Part of Speech (POS), sentiment intensity and tf-idf features, classified using linear SVM and stacking methods.
 
+* [Report](COMP90051_Assignment1_Report_Group199.pdf)
+
 ## Group Information
 ### Group Number
 Group 199
